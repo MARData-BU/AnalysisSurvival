@@ -29,7 +29,7 @@ analyze_survival(
 
 \item{time_var}{Character string specifying column name for time.}
 
-\item{event_var}{Character string specifying column name for event/status (0/1 - where 0 is censored and 1 event - or 1/2 - where 1 is censored and 2 is event -).}
+\item{event_var}{Character string specifying column name for event/status (0/1 or FALSE/TRUE).}
 
 \item{test_var}{Character string specifying primary grouping variable to test.}
 
@@ -45,11 +45,11 @@ analyze_survival(
 
 \item{conf_int}{Numeric confidence level (default 0.95).}
 
-\item{custom_colors}{Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".}
+\item{custom_colors}{Vector of hex color codes or color names for plot strata.}
 
-\item{custom_linetypes}{Vector of linetypes for plot strata as in ggsurvplot. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.}
+\item{custom_linetypes}{Vector of linetypes for plot strata.}
 
-\item{break_time_by}{Step size for x-axis time breaks. Automatically calculated if NULL (default).}
+\item{break_time_by}{Step size for x-axis time breaks. Automatically calculated if NULL.}
 
 \item{plot}{Logical; whether to draw and export PNG plot (default TRUE).}
 }
@@ -62,4 +62,66 @@ A data.frame containing sample sizes, median survival with CIs,
 Generates Kaplan-Meier survival curves, fits Cox proportional hazards
 models (univariate or multivariable), checks proportional hazards
 assumptions via Schoenfeld residuals, and outputs summary statistics.
+}
+\examples{
+\dontrun{
+# 1. Univariate model (strata > 1)
+analyze_survival(
+  data = data, 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = "Sex", 
+  ref_level = "Male", 
+  analysis_name = "Sex", 
+  filename = file.path(resultsDir, "Male_vs_Female.png"), 
+  covariates = NULL, 
+  interaction_var = NULL,
+  conf_int = 0.90
+)
+
+# 2. Multivariable model (without interaction)
+analyze_survival(
+  data = data, 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = "Sex", 
+  ref_level = "Male", 
+  analysis_name = "Sex_multi_Age", 
+  filename = file.path(resultsDir, "Male_vs_Female.png"), 
+  covariates = "Age", 
+  interaction_var = NULL,
+  conf_int = 0.90
+)
+
+# 3. Multivariable model (with interaction)
+analyze_survival(
+  data = data, 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = "Sex", 
+  ref_level = "Male", 
+  analysis_name = "Sex_interact_Age", 
+  filename = file.path(resultsDir, "Male_vs_Female.png"), 
+  covariates = "Age", 
+  interaction_var = "Age",
+  conf_int = 0.90
+)
+
+# 4. Univariate model (strata == 1)
+analyze_survival(
+  data = data[which(data$Sex == "Female"), ], 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = "Sex", 
+  analysis_name = "Sex", 
+  filename = file.path(resultsDir, "Female_distribution.png"), 
+  covariates = NULL, 
+  interaction_var = NULL,
+  conf_int = 0.90
+)
+}
 }
