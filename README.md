@@ -17,3 +17,56 @@
   - Overall log-rank test $p$-value
   - Proportional hazards assumption test $p$-values
   - Interaction $p$-values (if specified)
+
+## Examples:
+
+# Univariate model (strata > 1)
+analyze_survival(data = data, 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = "Sex", 
+  ref_level = "Male", 
+  analysis_name = "Sex", 
+  filename = file.path(resultsDir, "Male_vs_Female.png"), 
+  covariates = NULL, 
+  interaction_var = NULL,
+  conf_int = 0.90)
+
+# Multivariate model (without interaction)
+analyze_survival(data = data, 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = "Sex", 
+  ref_level = "Male", 
+  analysis_name = "Sex_multi_Age", 
+  filename = file.path(resultsDir, "Male_vs_Female.png"), 
+  covariates = "Age", 
+  interaction_var = NULL,
+  conf_int = 0.90)
+
+# Multivariate model (with interaction)
+analyze_survival(data = data, 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = "Sex", 
+  ref_level = "Male", 
+  analysis_name = "Sex_interact_Age", 
+  filename = file.path(resultsDir, "Male_vs_Female.png"), 
+  covariates = "Age", 
+  interaction_var = "Age",
+  conf_int = 0.90)
+
+# Univariate model (strata == 1)
+analyze_survival(data = data[which(data$Sex == "Female"),], 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = "Sex", 
+  analysis_name = "Sex", 
+  filename = file.path(resultsDir, "Female_distribution.png"), 
+  covariates = NULL, 
+  interaction_var = NULL,
+  conf_int = 0.90)
