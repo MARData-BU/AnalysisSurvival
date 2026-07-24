@@ -1,0 +1,7 @@
+export(analyze_survival)
+
+import(survival)
+import(ggplot2)
+import(survminer)
+importFrom(stats, as.formula, complete.cases, pchisq, relevel, anova)
+importFrom(grDevices, colorRampPalette, dev.off, png)
