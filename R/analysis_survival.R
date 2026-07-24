@@ -8,7 +8,7 @@
 #' @param data A data.frame containing clinical/survival data.
 #' @param outcome Character string describing the outcome (e.g., "Overall Survival").
 #' @param time_var Character string specifying column name for time.
-#' @param event_var Character string specifying column name for event/status (0/1 or FALSE/TRUE).
+#' @param event_var Character string specifying column name for event/status (0/1 - where 0 is censored and 1 event - or 1/2 - where 1 is censored and 2 is event -).
 #' @param test_var Character string specifying primary grouping variable to test.
 #' @param covariates Optional character vector of covariate column names for multivariable adjustment.
 #' @param interaction_var Optional character vector for interaction term testing.
@@ -16,9 +16,9 @@
 #' @param analysis_name Title label for the analysis and plot.
 #' @param filename File path/name for saving the KM plot PNG (default "KM.png").
 #' @param conf_int Numeric confidence level (default 0.95).
-#' @param custom_colors Vector of hex color codes or color names for plot strata.
-#' @param custom_linetypes Vector of linetypes for plot strata.
-#' @param break_time_by Step size for x-axis time breaks. Automatically calculated if NULL.
+#' @param custom_colors Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".
+#' @param custom_linetypes Vector of linetypes for plot strata as in ggsurvplot. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.
+#' @param break_time_by Step size for x-axis time breaks. Automatically calculated if NULL (default).
 #' @param plot Logical; whether to draw and export PNG plot (default TRUE).
 #'
 #' @return A data.frame containing sample sizes, median survival with CIs, 
