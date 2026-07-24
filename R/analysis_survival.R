@@ -1,21 +1,29 @@
-#' Run Survival Analysis and Generate Plots
+#' Run Automated Survival Analysis, KM Plotting, and Cox Modeling
 #'
-#' @param data Data frame containing survival data.
-#' @param outcome Name of outcome variable (e.g. "PFS").
-#' @param time_var Time variable name. 
-#' @param event_var Event variable name. Must be either 0/1 (being 0 censored, and 1 event) or 1/2 (being 1 censored and 2 event).
-#' @param test_var Predictor variable name.
-#' @param covariates Optional covariates vector (can be >1). 
-#' @param interaction_var Optional interaction variable  (can be >1).
-#' @param ref_level Reference level for test_var. If no level is specified, the reference level will be selected by alphanumerical order. 
-#' @param analysis_name Analysis title label.
-#' @param filename File path to save output plot.
-#' @param conf_int Confidence interval level (default 0.95).
-#' @param custom_colors Palette color vector. Default colours are #1B9E77, #D95F02, #7570B3, #E7298A, #E6AB02 and #66A61E.
-#' @param custom_linetypes Linetypes for curves as per ggsurvplot function (default is 1, solid).
-#' @param break_time_by Step size for x-axis time breaks. If this argument is not specified, it is automatically set. 
-#' @param plot Logical; whether to generate and save plot.
-#' @return A summary data frame of median survival and hazard ratios.
+#' @description
+#' Generates Kaplan-Meier survival curves, fits Cox proportional hazards 
+#' models (univariate or multivariable), checks proportional hazards 
+#' assumptions via Schoenfeld residuals, and outputs summary statistics.
+#'
+#' @param data A data.frame containing clinical/survival data.
+#' @param outcome Character string describing the outcome (e.g., "Overall Survival").
+#' @param time_var Character string specifying column name for time.
+#' @param event_var Character string specifying column name for event/status (0/1 or FALSE/TRUE).
+#' @param test_var Character string specifying primary grouping variable to test.
+#' @param covariates Optional character vector of covariate column names for multivariable adjustment.
+#' @param interaction_var Optional character vector for interaction term testing.
+#' @param ref_level Optional character string specifying reference level for `test_var`.
+#' @param analysis_name Title label for the analysis and plot.
+#' @param filename File path/name for saving the KM plot PNG (default "KM.png").
+#' @param conf_int Numeric confidence level (default 0.95).
+#' @param custom_colors Vector of hex color codes or color names for plot strata.
+#' @param custom_linetypes Vector of linetypes for plot strata.
+#' @param break_time_by Step size for x-axis time breaks. Automatically calculated if NULL.
+#' @param plot Logical; whether to draw and export PNG plot (default TRUE).
+#'
+#' @return A data.frame containing sample sizes, median survival with CIs, 
+#'   hazard ratios (HR/aHR) with CIs, log-rank p-values, proportional hazards test 
+#'   p-values, and interaction p-values.
 #' @export
 
 analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
