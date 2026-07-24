@@ -1,0 +1,27 @@
+Package: AnalysisSurvival
+Type: Package
+Title: Automated Survival Analysis, Kaplan-Meier Plotting, and Cox Modeling
+Version: 0.1.0
+Date: 2026-07-24
+Authors@R: c(
+    person("Pau", "Berenguer-Molins", 
+           email = "pberenguer@researchmar.net", 
+           role = c("aut", "cre")),
+    person("MarData Bioinformatics Unit", 
+           email = "mardata-bu@researchmar.net", 
+           role = "cph")
+  )
+Description: Standardized workflow for clinical survival analysis. Computes Kaplan-Meier 
+    estimates, log-rank tests, and univariate or multivariable Cox proportional hazards 
+    models. Automatically extracts median survival times with confidence intervals, 
+    evaluates proportional hazards assumptions via Schoenfeld residuals, tests for 
+    interaction terms, and outputs publication-ready KM curve figures.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    ggplot2,
+    grDevices,
+    stats,
+    survival,
+    survminer
