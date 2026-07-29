@@ -34,25 +34,38 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
                         covariates = c(), interaction_var = NULL,
                         ref_level = NULL, conf_level = 0.95) {
   
-  data <- set_ref_level(data, test_var, ref_level)
+  # A numeric test_var is treated as continuous 
+  test_var_is_numeric <- is.numeric(data[[test_var]])
+  
+  if (test_var_is_numeric) {
+    if (!is.null(ref_level)) {
+      warning("ref_level is ignored because '", test_var, "' is numeric (continuous); ",
+              "reference levels only apply to categorical variables.")
+    }
+  } else {
+    data <- set_ref_level(data, test_var, ref_level)
+  }
   
   is_adjusted <- length(covariates) > 0
   ci_label <- paste0(if (is_adjusted) "aHR_" else "HR_", round(conf_level * 100), "CI")
-
-  km_formula_test <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, test_var))
-  fit_km <- survfit(km_formula_test, data = data)
-  n_strata <- length(fit_km$strata)
   
-  if (n_strata <= 1) {
-    res <- data.frame(
-      Term = test_var, Group = "Overall", HR_CI = "1.00 (Ref)",
-      P_Value = "N/A", Variable_PH_p_value = "N/A", Global_PH_p_value = "N/A",
-      P_for_Interaction = "N/A", stringsAsFactors = FALSE
-    )
-    colnames(res)[3] <- ci_label
-    return(res)
+  if (!test_var_is_numeric) {
+    km_formula_test <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, test_var))
+    fit_km <- survfit(km_formula_test, data = data)
+    n_strata <- length(fit_km$strata)
+    
+    if (n_strata <= 1) {
+      res <- data.frame(
+        Term = test_var, Group = "Overall", HR_CI = "1.00 (Ref)",
+        P_Value = "N/A", Variable_PH_p_value = "N/A", Global_PH_p_value = "N/A",
+        P_for_Interaction = "N/A", stringsAsFactors = FALSE
+      )
+      colnames(res)[3] <- ci_label
+      return(res)
+    }
   }
   
+  # Full model: test_var + covariates
   all_vars <- unique(c(test_var, covariates))
   main_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, paste(all_vars, collapse = " + ")))
   cox_main <- tryCatch(coxph(main_formula, data = data), error = function(e) NULL)
@@ -100,6 +113,7 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
     if (v %in% names(ph_by_term)) ph_by_term[[v]] else "N/A"
   })
   
+  # --- Optional single interaction term (test_var * interaction_var) ---
   interaction_col <- rep("N/A", length(term_names))
   if (!is.null(interaction_var) && length(interaction_var) > 0) {
     valid_int_vars <- intersect(interaction_var, all_vars)
@@ -136,13 +150,20 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
     stringsAsFactors = FALSE
   )
   
+  if (test_var_is_numeric) {
+    res <- res_non_ref
+    colnames(res)[3] <- ci_label
+    return(res)
+  }
+  
+  # --- Explicit reference row for test_var (categorical only) ---
   all_levels <- levels(as.factor(data[[test_var]]))
-  ref_level <- setdiff(all_levels, clean_groups[is_test_var_term])[1]
+  ref_level_label <- setdiff(all_levels, clean_groups[is_test_var_term])[1]
   ref_ph_p  <- if (any(is_test_var_term)) var_ph_p_col[which(is_test_var_term)[1]] else "N/A"
   ref_int_p <- if (any(is_test_var_term)) interaction_col[which(is_test_var_term)[1]] else "N/A"
   
   res_ref <- data.frame(
-    Term = test_var, Group = ref_level, HR_CI = "1.00 (Ref)", P_Value = "Ref",
+    Term = test_var, Group = ref_level_label, HR_CI = "1.00 (Ref)", P_Value = "Ref",
     Variable_PH_p_value = ref_ph_p, Global_PH_p_value = global_ph_p,
     P_for_Interaction = ref_int_p, stringsAsFactors = FALSE
   )
