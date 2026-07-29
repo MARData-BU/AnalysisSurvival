@@ -30,11 +30,22 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
                              covariates = c(), interaction_var = NULL,
                              ref_level = NULL, analysis_name = NA, filename = "KM.png",
                              conf_int = 0.95, custom_colors = default_colors,
-                             custom_linetypes = 1, break_time_by = NULL, plot = TRUE) {
+                             custom_linetypes = 1, break_time_by = NULL) {
+  
+  test_var_is_numeric <- is.numeric(data[[test_var]])
   
   data[[time_var]]  <- as.numeric(data[[time_var]])
   data[[event_var]] <- as.numeric(data[[event_var]])
-  data <- set_ref_level(data, test_var, ref_level)
+  
+  if (test_var_is_numeric) {
+    if (!is.null(ref_level)) {
+      warning("ref_level is ignored because '", test_var, "' is numeric (continuous); ",
+              "reference levels only apply to categorical variables.")
+    }
+  } else {
+    data <- set_ref_level(data, test_var, ref_level)
+  }
+  
   for (v in covariates) {
     if (is.character(data[[v]]) || is.factor(data[[v]])) data[[v]] <- as.factor(data[[v]])
   }
@@ -46,7 +57,45 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
     message(paste("Skipping analysis:", analysis_name, "- Data is empty (or no complete cases)."))
     return(NULL)
   }
-
+  
+  # ============================================================
+  # Numeric test_var: Cox model only. No KM curve exists to plot or to
+  # pull a median survival time from, so both are skipped entirely.
+  # ============================================================
+  if (test_var_is_numeric) {
+    message("'", test_var, "' is numeric: fitting a Cox model only - ",
+            "Kaplan-Meier curves, median survival, and the plot do not apply to a continuous variable.")
+    
+    df_hrs <- get_cox_hrs(data, time_var, event_var, test_var, covariates, interaction_var,
+                          ref_level = NULL, conf_level = conf_int)
+    if (is.null(df_hrs)) return(NULL)
+    
+    hr_col <- grep("^a?HR_.*CI$", colnames(df_hrs), value = TRUE)[1]
+    
+    summary_results <- data.frame(
+      Scenario            = analysis_name,
+      Outcome             = outcome,
+      Variable_Term       = df_hrs$Term,
+      Group               = df_hrs$Group,
+      N                   = nrow(data),
+      Median_Survival     = NA_character_,
+      HR_CI               = df_hrs[[hr_col]],
+      P_Value             = df_hrs$P_Value,
+      Overall_LogRank_P   = "N/A",
+      Variable_PH_p_value = df_hrs$Variable_PH_p_value,
+      Global_PH_p_value   = df_hrs$Global_PH_p_value,
+      P_for_Interaction   = df_hrs$P_for_Interaction,
+      Adjusted_For        = if (length(covariates) > 0) paste(covariates, collapse = ", ") else "Unadjusted (univariate)",
+      stringsAsFactors    = FALSE
+    )
+    colnames(summary_results)[7] <- hr_col
+    return(summary_results)
+  }
+  
+  # ============================================================
+  # Categorical test_var (factor/character): existing KM + Cox + plot
+  # ============================================================
+  
   km_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, test_var))
   fit_km <- survfit(km_formula, data = data, conf.type = "log-log", conf.int = conf_int)
   fit_km$call$formula <- km_formula
@@ -55,7 +104,7 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
   df_hrs <- get_cox_hrs(data, time_var, event_var, test_var, covariates, interaction_var,
                         ref_level = ref_level, conf_level = conf_int)
   if (is.null(df_hrs)) return(NULL)
-
+  
   df_stats <- merge(df_medians, df_hrs, by = "Group", all.y = TRUE)
   
   n_strata <- length(fit_km$strata)
@@ -99,32 +148,29 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
     return(NULL)
   }
   
-  if(plot == TRUE){
+  p <- ggsurvplot(
+    fit_km, data = data, risk.table = TRUE, legend.title = "",
+    break.time.by = if (is.null(break_time_by)) choose_break_time(max(data[[time_var]], na.rm = TRUE)) else break_time_by,
+    fontsize = 3, title = analysis_name,
+    ggtheme = theme_classic2(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
+    palette = custom_colors, linetype = custom_linetypes, legend = c(0.7, 0.9),
+    linewidth = 1, surv.median.line = "hv", risk.table.height = 0.15,
+    tables.theme = clean_theme(), break.y.by = 0.1, surv.scale = "percent", pval = FALSE
+  )
   
-    p <- ggsurvplot(
-      fit_km, data = data, risk.table = TRUE, legend.title = "",
-      break.time.by = if (is.null(break_time_by)) choose_break_time(max(data[[time_var]], na.rm = TRUE)) else break_time_by,
-      fontsize = 3, title = analysis_name,
-      ggtheme = theme_classic2(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
-      palette = custom_colors, linetype = custom_linetypes, legend = c(0.7, 0.9),
-      linewidth = 1, surv.median.line = "hv", risk.table.height = 0.15,
-      tables.theme = clean_theme(), break.y.by = 0.1, surv.scale = "percent", pval = FALSE
+  annot_text <- generate_surv_annotation(km_formula, data, df_hrs, test_var, conf_level = conf_int)
+  if (!is.null(annot_text)) {
+    p$plot <- p$plot + ggplot2::annotate(
+      "text", x = 1, y = 0.15, label = annot_text,
+      hjust = 0, vjust = 0, size = 3.5, fontface = "italic"
     )
-    
-    annot_text <- generate_surv_annotation(km_formula, data, df_hrs, test_var, conf_level = conf_int)
-    if (!is.null(annot_text)) {
-      p$plot <- p$plot + ggplot2::annotate(
-        "text", x = 1, y = 0.15, label = annot_text,
-        hjust = 0, vjust = 0, size = 3.5, fontface = "italic"
-      )
-    }
-    
-    if (!grepl("\\.png$", filename, ignore.case = TRUE)) filename <- paste0(filename, ".png")
-    png(filename, width = 8, height = 6, units = "in", res = 300)
-    on.exit(dev.off(), add = TRUE)
-    print(p)
   }
   
-  return(summary_results)
+  if (!grepl("\\.png$", filename, ignore.case = TRUE)) filename <- paste0(filename, ".png")
+  png(filename, width = 8, height = 6, units = "in", res = 300)
+  on.exit(dev.off(), add = TRUE)
+  print(p)
   
+  return(summary_results)
 }
+
