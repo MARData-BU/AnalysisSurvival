@@ -9,7 +9,7 @@
 #' @param outcome Character string describing the outcome (e.g., "Overall Survival").
 #' @param time_var Character string specifying column name for time.
 #' @param event_var Character string specifying column name for event/status (0/1 - where 0 is censored and 1 event - or 1/2 - where 1 is censored and 2 is event -).
-#' @param test_var Character string specifying primary grouping variable to test.
+#' @param test_var Character string specifying primary grouping variable(s) to test.
 #' @param covariates Optional character vector of covariate column names for multivariable adjustment.
 #' @param interaction_var Optional character vector for interaction term testing.
 #' @param ref_level Optional character string specifying reference level for `test_var`.
@@ -32,10 +32,35 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
                              conf_int = 0.95, custom_colors = default_colors,
                              custom_linetypes = 1, break_time_by = NULL) {
   
-  test_var_is_numeric <- is.numeric(data[[test_var]])
-  
   data[[time_var]]  <- as.numeric(data[[time_var]])
   data[[event_var]] <- as.numeric(data[[event_var]])
+  is_combined_test_var <- length(test_var) > 1
+  
+  if (length(test_var) > 1) {
+    for (v in test_var) {
+      if (is.numeric(data[[v]]) && length(unique(stats::na.omit(data[[v]]))) > 10) {
+        warning("'", v, "' looks continuous (more than 10 unique values) and is being combined ",
+                "as a categorical grouping variable; consider discretizing it first if that is not intended.")
+      }
+    }
+    combo_name <- paste(test_var, collapse = "_x_")
+    while (combo_name %in% names(data)) combo_name <- paste0(combo_name, "_")
+    
+    labeled_parts <- lapply(test_var, function(v) paste(v, as.character(data[[v]])))
+    combo_vals <- do.call(paste, c(labeled_parts, list(sep = " + ")))
+
+    any_na <- Reduce(`|`, lapply(test_var, function(v) is.na(data[[v]])))
+    combo_vals[any_na] <- NA
+    
+    data[[combo_name]] <- droplevels(factor(combo_vals))
+    test_var <- combo_name
+  }
+  
+  # --- Type conversions ---
+  # A numeric test_var is treated as continuous: no KM curves, no median
+  # survival (neither concept applies to a continuous variable), and no
+  # plot - only a Cox model with test_var as a continuous predictor.
+  test_var_is_numeric <- is.numeric(data[[test_var]])
   
   if (test_var_is_numeric) {
     if (!is.null(ref_level)) {
@@ -96,6 +121,8 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
   # Categorical test_var (factor/character): existing KM + Cox + plot
   # ============================================================
   
+  # KM curve is always fit on test_var alone (covariates are adjusted for in
+  # the Cox model, not used to define the survival curves being plotted).
   km_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, test_var))
   fit_km <- survfit(km_formula, data = data, conf.type = "log-log", conf.int = conf_int)
   fit_km$call$formula <- km_formula
@@ -105,6 +132,9 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
                         ref_level = ref_level, conf_level = conf_int)
   if (is.null(df_hrs)) return(NULL)
   
+  # Merge: covariate rows (Age, Sex...) have no matching Group in df_medians,
+  # so N / Median_Survival are legitimately NA for them - they are adjustment
+  # variables, not strata that were used to build a survival curve.
   df_stats <- merge(df_medians, df_hrs, by = "Group", all.y = TRUE)
   
   n_strata <- length(fit_km$strata)
@@ -150,6 +180,7 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
   
   p <- ggsurvplot(
     fit_km, data = data, risk.table = TRUE, legend.title = "",
+    legend.labs = if (is_combined_test_var) levels(droplevels(as.factor(data[[test_var]]))) else NULL,
     break.time.by = if (is.null(break_time_by)) choose_break_time(max(data[[time_var]], na.rm = TRUE)) else break_time_by,
     fontsize = 3, title = analysis_name,
     ggtheme = theme_classic2(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
