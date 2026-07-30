@@ -6,8 +6,8 @@ get_km_medians <- function(surv_formula, data, conf_level = 0.95) {
   if (is.null(dim(km_tab))) {
     km_tab <- matrix(km_tab, nrow = 1, dimnames = list("Overall", names(km_tab)))
   }
-  
-  group_names <- gsub(".*=", "", rownames(km_tab))
+
+  group_names <- gsub("^[^=]*=", "", rownames(km_tab))
   strata_counts <- if (!is.null(fit_km$strata)) fit_km$n else nrow(data)
   
   lcl_col <- grep("LCL$", colnames(km_tab), value = TRUE)
