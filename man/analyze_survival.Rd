@@ -31,7 +31,7 @@ analyze_survival(
 
 \item{event_var}{Character string specifying column name for event/status (0/1 or FALSE/TRUE).}
 
-\item{test_var}{Character string specifying primary grouping variable to test.}
+\item{test_var}{Character string specifying primary grouping variable(s) to test.}
 
 \item{covariates}{Optional character vector of covariate column names for multivariable adjustment.}
 
