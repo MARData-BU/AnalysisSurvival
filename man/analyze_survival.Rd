@@ -123,5 +123,19 @@ analyze_survival(
   interaction_var = NULL,
   conf_int = 0.90
 )
+
+# 5. Use 2 variables to group
+analyze_survival(
+  data = data, 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = c("Sex", "Treatment"), 
+  analysis_name = "Sex+Treatment", 
+  filename = file.path(resultsDir, "Sex_treatment.png"), 
+  covariates = NULL, 
+  interaction_var = NULL,
+  conf_int = 0.90
+)
 }
 }
