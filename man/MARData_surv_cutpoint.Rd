@@ -14,79 +14,63 @@ MARData_surv_cutpoint(
   interaction_var = NULL,
   ref_level = NULL,
   analysis_name = NA,
-  filename = "KM.png",
+  filename = paste0(test_var, "_optimal_cutpoint.png"),
   conf_int = 0.95,
   custom_colors = default_colors,
   custom_linetypes = 1,
   break_time_by = NULL,
   minprop = 0.1,
   plot = TRUE,
-  width = 8, 
-  height = 6, 
+  width = 8,
+  height = 6,
   res = 300
 )
 }
 \arguments{
 \item{data}{A data.frame containing clinical/survival data.}
-
 \item{outcome}{Character string describing the outcome (e.g., "Overall Survival").}
-
 \item{time_var}{Character string specifying column name for time.}
-
 \item{event_var}{Character string specifying column name for event/status (0/1 or FALSE/TRUE).}
-
 \item{test_var}{Character string specifying primary grouping numerical variable to test.}
-
 \item{covariates}{Optional character vector of covariate column names for multivariable adjustment.}
-
 \item{interaction_var}{Optional character vector for interaction term testing. The variable must be within the "covariates" variables as well.}
-
-\item{ref_level}{Optional character string specifying reference level for \code{test_var}.}
-
+\item{ref_level}{Optional character string specifying reference level for the low/high grouping (must be "low" or "high").}
 \item{analysis_name}{Title label for the analysis and plot.}
-
-\item{filename} File path/name for saving the KM plot (default "KM.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".}
-
+\item{filename}{File path/name for saving the KM plot (default \code{paste0(test_var, "_optimal_cutpoint.png")}). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".}
 \item{conf_int}{Numeric confidence level (default 0.95).}
-
 \item{custom_colors}{Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".}
-
 \item{custom_linetypes}{Vector of linetypes for plot strata. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.}
-
 \item{break_time_by}{Step size for x-axis time breaks. Automatically calculated if NULL.}
-
 \item{minprop}{Numeric the minimal proportion of observations per group (default 0.1).}
-
-\item{plot}{Logical; whether to draw and export PNG plot (default TRUE).}
-
-\item{width}{Numeric; height of the plot to save, in inches (default 8).}
-
+\item{plot}{Logical; whether to draw and export a plot (default TRUE).}
+\item{width}{Numeric; width of the plot to save, in inches (default 8).}
 \item{height}{Numeric; height of the plot to save, in inches (default 6).}
-
 \item{res}{Numeric; resolution of the plot to save (default 300).}
-
 }
 \value{
 A data.frame containing sample sizes, median survival with CIs,
   hazard ratios (HR/aHR) with CIs, log-rank p-values, proportional hazards test
-  p-values, and interaction p-values.
+  p-values, interaction p-values, and the optimal cutpoint used to dichotomize
+  \code{test_var} into "low"/"high" groups.
 }
 \description{
-Generates Kaplan-Meier survival curves, fits Cox proportional hazards
-models (univariate or multivariable), checks proportional hazards
-assumptions via Schoenfeld residuals, and outputs summary statistics.
+Determines the optimal dichotomizing cutpoint of a numeric \code{test_var}
+via \code{survminer::surv_cutpoint()}/\code{surv_categorize()}, then runs the
+same Kaplan-Meier, log-rank, and Cox proportional hazards pipeline as
+\code{MARData_surv_analysis()} on the resulting low/high grouping, checking
+proportional hazards assumptions via Schoenfeld residuals.
 }
 \examples{
 \dontrun{
-MARData_surv_cutpoiont(data = data, 
-                       outcome = "PFS", 
-                       time_var = "pfs_time", 
-                       event_var = "pfs_event", 
-                       test_var = "Age", 
-                       analysis_name = "Age_optimal", 
-                       filename = file.path(resultsDir, "Age_optimal_categorization.png"), 
-                       covariates = NULL, 
-                       interaction_var = NULL, 
+MARData_surv_cutpoint(data = data,
+                       outcome = "PFS",
+                       time_var = "pfs_time",
+                       event_var = "pfs_event",
+                       test_var = "Age",
+                       analysis_name = "Age_optimal",
+                       filename = file.path(resultsDir, "Age_optimal_categorization.png"),
+                       covariates = NULL,
+                       interaction_var = NULL,
                        conf_int = 0.90)
 }
 }
