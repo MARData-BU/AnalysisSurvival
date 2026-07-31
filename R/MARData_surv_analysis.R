@@ -11,31 +11,35 @@
 #' @param event_var Character string specifying column name for event/status (0/1 - where 0 is censored and 1 event - or 1/2 - where 1 is censored and 2 is event -).
 #' @param test_var Character string specifying primary grouping variable(s) to test.
 #' @param covariates Optional character vector of covariate column names for multivariable adjustment.
-#' @param interaction_var Optional character vector for interaction term testing.
+#' @param interaction_var Optional character vector for interaction term testing. The variable must be within the "covariates" variables as well. 
 #' @param ref_level Optional character string specifying reference level for `test_var`.
 #' @param analysis_name Title label for the analysis and plot.
-#' @param filename File path/name for saving the KM plot PNG (default "KM.png").
+#' @param filename File path/name for saving the KM plot (default "KM.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".
 #' @param conf_int Numeric confidence level (default 0.95).
 #' @param custom_colors Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".
 #' @param custom_linetypes Vector of linetypes for plot strata as in ggsurvplot. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.
 #' @param break_time_by Step size for x-axis time breaks. Automatically calculated if NULL (default).
-#' @param plot Logical; whether to draw and export PNG plot (default TRUE).
+#' @param plot Logical; whether to draw and export plot (default TRUE).
+#' @param width Numeric; width of the plot to save, in inches (default 8).
+#' @param height Numeric; height of the plot to save, in inches (default 6).
+#' @param res Numeric; resolution of the plot to save (default 300).
 #'
 #' @return A data.frame containing sample sizes, median survival with CIs, 
 #'   hazard ratios (HR/aHR) with CIs, log-rank p-values, proportional hazards test 
 #'   p-values, and interaction p-values.
 #' @export
 
-analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
-                             covariates = c(), interaction_var = NULL,
-                             ref_level = NULL, analysis_name = NA, filename = "KM.png",
-                             conf_int = 0.95, custom_colors = default_colors,
-                             custom_linetypes = 1, break_time_by = NULL) {
-  
+MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_var,
+                              covariates = c(), interaction_var = NULL,
+                              ref_level = NULL, analysis_name = NA, filename = "KM.png",
+                              conf_int = 0.95, custom_colors = default_colors,
+                              custom_linetypes = 1, break_time_by = NULL,
+                              plot = TRUE, width = 8, height = 6, res = 300) {
+
   data[[time_var]]  <- as.numeric(data[[time_var]])
   data[[event_var]] <- as.numeric(data[[event_var]])
   is_combined_test_var <- length(test_var) > 1
-  
+
   if (length(test_var) > 1) {
     for (v in test_var) {
       if (is.numeric(data[[v]]) && length(unique(stats::na.omit(data[[v]]))) > 10) {
@@ -45,23 +49,20 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
     }
     combo_name <- paste(test_var, collapse = "_x_")
     while (combo_name %in% names(data)) combo_name <- paste0(combo_name, "_")
-    
+
     labeled_parts <- lapply(test_var, function(v) paste(v, as.character(data[[v]])))
     combo_vals <- do.call(paste, c(labeled_parts, list(sep = " + ")))
-
+    # A row with a missing value in ANY of the component variables must stay NA in the combined column too
     any_na <- Reduce(`|`, lapply(test_var, function(v) is.na(data[[v]])))
     combo_vals[any_na] <- NA
-    
+
     data[[combo_name]] <- droplevels(factor(combo_vals))
     test_var <- combo_name
   }
-  
-  # --- Type conversions ---
-  # A numeric test_var is treated as continuous: no KM curves, no median
-  # survival (neither concept applies to a continuous variable), and no
-  # plot - only a Cox model with test_var as a continuous predictor.
+
+  # A numeric test_var is treated as continuous: no KM curves, no median survival, and no plot - only a Cox model with test_var as a continuous predictor.
   test_var_is_numeric <- is.numeric(data[[test_var]])
-  
+
   if (test_var_is_numeric) {
     if (!is.null(ref_level)) {
       warning("ref_level is ignored because '", test_var, "' is numeric (continuous); ",
@@ -70,33 +71,32 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
   } else {
     data <- set_ref_level(data, test_var, ref_level)
   }
-  
+
   for (v in covariates) {
     if (is.character(data[[v]]) || is.factor(data[[v]])) data[[v]] <- as.factor(data[[v]])
   }
-  
+
   model_cols <- c(time_var, event_var, test_var, covariates)
   data <- data[complete.cases(data[, model_cols, drop = FALSE]), ]
-  
+
   if (nrow(data) == 0) {
     message(paste("Skipping analysis:", analysis_name, "- Data is empty (or no complete cases)."))
     return(NULL)
   }
-  
+
   # ============================================================
-  # Numeric test_var: Cox model only. No KM curve exists to plot or to
-  # pull a median survival time from, so both are skipped entirely.
+  # Numeric test_var: Cox model only. 
   # ============================================================
   if (test_var_is_numeric) {
     message("'", test_var, "' is numeric: fitting a Cox model only - ",
             "Kaplan-Meier curves, median survival, and the plot do not apply to a continuous variable.")
-    
+
     df_hrs <- get_cox_hrs(data, time_var, event_var, test_var, covariates, interaction_var,
                           ref_level = NULL, conf_level = conf_int)
     if (is.null(df_hrs)) return(NULL)
-    
+
     hr_col <- grep("^a?HR_.*CI$", colnames(df_hrs), value = TRUE)[1]
-    
+
     summary_results <- data.frame(
       Scenario            = analysis_name,
       Outcome             = outcome,
@@ -116,27 +116,21 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
     colnames(summary_results)[7] <- hr_col
     return(summary_results)
   }
-  
+
   # ============================================================
   # Categorical test_var (factor/character): existing KM + Cox + plot
   # ============================================================
-  
-  # KM curve is always fit on test_var alone (covariates are adjusted for in
-  # the Cox model, not used to define the survival curves being plotted).
   km_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, test_var))
   fit_km <- survfit(km_formula, data = data, conf.type = "log-log", conf.int = conf_int)
   fit_km$call$formula <- km_formula
-  
+
   df_medians <- get_km_medians(km_formula, data, conf_level = conf_int)
   df_hrs <- get_cox_hrs(data, time_var, event_var, test_var, covariates, interaction_var,
                         ref_level = ref_level, conf_level = conf_int)
   if (is.null(df_hrs)) return(NULL)
-  
-  # Merge: covariate rows (Age, Sex...) have no matching Group in df_medians,
-  # so N / Median_Survival are legitimately NA for them - they are adjustment
-  # variables, not strata that were used to build a survival curve.
+
   df_stats <- merge(df_medians, df_hrs, by = "Group", all.y = TRUE)
-  
+
   n_strata <- length(fit_km$strata)
   if (n_strata > 1) {
     surv_diff <- survdiff(km_formula, data = data)
@@ -145,10 +139,10 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
   } else {
     overall_p_str <- "N/A"
   }
-  
+
   med_col <- grep("^Median_Survival", colnames(df_stats), value = TRUE)[1]
   hr_col  <- grep("^a?HR_.*CI$", colnames(df_stats), value = TRUE)[1]
-  
+
   summary_results <- data.frame(
     Scenario           = analysis_name,
     Outcome            = outcome,
@@ -166,42 +160,56 @@ analyze_survival <- function(data, outcome = NA, time_var, event_var, test_var,
     stringsAsFactors   = FALSE
   )
   colnames(summary_results)[7] <- hr_col
-  
-  n_curves <- max(n_strata, 1)
-  if (n_curves > length(custom_colors)) {
-    custom_colors <- grDevices::colorRampPalette(custom_colors)(n_curves)
-  }
-  if (length(custom_linetypes) == 1) {
-    custom_linetypes <- rep(custom_linetypes, n_curves)
-  } else if (length(custom_linetypes) < n_curves) {
-    message("The number of strata is ", n_curves, " but the number of linetypes set is ", length(custom_linetypes))
-    return(NULL)
-  }
-  
-  p <- ggsurvplot(
-    fit_km, data = data, risk.table = TRUE, legend.title = "",
-    legend.labs = if (is_combined_test_var) levels(droplevels(as.factor(data[[test_var]]))) else NULL,
-    break.time.by = if (is.null(break_time_by)) choose_break_time(max(data[[time_var]], na.rm = TRUE)) else break_time_by,
-    fontsize = 3, title = analysis_name,
-    ggtheme = theme_classic2(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
-    palette = custom_colors, linetype = custom_linetypes, legend = c(0.7, 0.9),
-    linewidth = 1, surv.median.line = "hv", risk.table.height = 0.15,
-    tables.theme = clean_theme(), break.y.by = 0.1, surv.scale = "percent", pval = FALSE
-  )
-  
-  annot_text <- generate_surv_annotation(km_formula, data, df_hrs, test_var, conf_level = conf_int)
-  if (!is.null(annot_text)) {
-    p$plot <- p$plot + ggplot2::annotate(
-      "text", x = 1, y = 0.15, label = annot_text,
-      hjust = 0, vjust = 0, size = 3.5, fontface = "italic"
+
+  if (plot) {
+    n_curves <- max(n_strata, 1)
+    if (n_curves > length(custom_colors)) {
+      custom_colors <- grDevices::colorRampPalette(custom_colors)(n_curves)
+    }
+    if (length(custom_linetypes) == 1) {
+      custom_linetypes <- rep(custom_linetypes, n_curves)
+    } else if (length(custom_linetypes) < n_curves) {
+      message("The number of strata is ", n_curves, " but the number of linetypes set is ", length(custom_linetypes))
+      return(NULL)
+    }
+
+    p <- ggsurvplot(
+      fit_km, data = data, risk.table = TRUE, legend.title = "",
+      legend.labs = if (is_combined_test_var) levels(droplevels(as.factor(data[[test_var]]))) else NULL,
+      break.time.by = if (is.null(break_time_by)) choose_break_time(max(data[[time_var]], na.rm = TRUE)) else break_time_by,
+      fontsize = 3, title = analysis_name,
+      ggtheme = theme_classic2(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
+      palette = custom_colors, linetype = custom_linetypes, legend = c(0.7, 0.9),
+      linewidth = 1, surv.median.line = "hv", risk.table.height = 0.15,
+      tables.theme = clean_theme(), break.y.by = 0.1, surv.scale = "percent", pval = FALSE
     )
+
+    annot_text <- generate_surv_annotation(km_formula, data, df_hrs, test_var, conf_level = conf_int)
+    if (!is.null(annot_text)) {
+      p$plot <- p$plot + ggplot2::annotate(
+        "text", x = 1, y = 0.15, label = annot_text,
+        hjust = 0, vjust = 0, size = 3.5, fontface = "italic"
+      )
+    }
+
+    ext <- tolower(tools::file_ext(filename))
+    raster_devices <- list(png = png, jpeg = jpeg, jpg = jpeg, tiff = tiff, bmp = bmp)
+    if (!(ext %in% c(names(raster_devices), "pdf", "svg"))) {
+      filename <- paste0(filename, ".png")
+      ext <- "png"
+    }
+
+    if (ext == "pdf") {
+      pdf(filename, width = width, height = height)
+    } else if (ext == "svg") {
+      svg(filename, width = width, height = height)
+    } else {
+      raster_devices[[ext]](filename, width = width, height = height, units = "in", res = res)
+    }
+    on.exit(dev.off(), add = TRUE)
+    print(p)
   }
-  
-  if (!grepl("\\.png$", filename, ignore.case = TRUE)) filename <- paste0(filename, ".png")
-  png(filename, width = 8, height = 6, units = "in", res = 300)
-  on.exit(dev.off(), add = TRUE)
-  print(p)
-  
+
   return(summary_results)
 }
 
