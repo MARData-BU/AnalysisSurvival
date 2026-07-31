@@ -1,6 +1,10 @@
-# AnalysisSurvival
+# MARData_surv_analysis
 
-`AnalysisSurvival` provides a standardized, publication-ready workflow for clinical survival analysis in R. It automates Kaplan-Meier curve generation, hazard ratio calculations via Cox proportional hazards models, proportional hazards assumption testing, and custom plot formatting.
+`MARData_surv_analysis` provides a standardized, publication-ready workflow for clinical survival analysis in R. It automates Kaplan-Meier curve generation, hazard ratio calculations via Cox proportional hazards models, proportional hazards assumption testing, and custom plot formatting.
+
+# MARData_surv_cutpoint
+
+`MARData_surv_cutpoint` provides a standardized, publication-ready workflow for clinical survival analysis in R, determining the optimal cutpoint for continuous variables. It automates Kaplan-Meier curve generation, hazard ratio calculations via Cox proportional hazards models, proportional hazards assumption testing, and custom plot formatting.
 
 ---
 
@@ -21,7 +25,7 @@
 ## Examples:
 
 # Univariate model (strata > 1)
-analyze_survival(data = data, 
+MARData_surv_analysis(data = data, 
   outcome = "PFS", 
   time_var = "pfs_time", 
   event_var = "pfs_event", 
@@ -34,7 +38,7 @@ analyze_survival(data = data,
   conf_int = 0.90)
 
 # Multivariate model (without interaction)
-analyze_survival(data = data, 
+MARData_surv_analysis(data = data, 
   outcome = "PFS", 
   time_var = "pfs_time", 
   event_var = "pfs_event", 
@@ -47,7 +51,7 @@ analyze_survival(data = data,
   conf_int = 0.90)
 
 # Multivariate model (with interaction)
-analyze_survival(data = data, 
+MARData_surv_analysis(data = data, 
   outcome = "PFS", 
   time_var = "pfs_time", 
   event_var = "pfs_event", 
@@ -60,13 +64,25 @@ analyze_survival(data = data,
   conf_int = 0.90)
 
 # Univariate model (strata == 1)
-analyze_survival(data = data[which(data$Sex == "Female"),], 
+MARData_surv_analysis(data = data[which(data$Sex == "Female"),], 
   outcome = "PFS", 
   time_var = "pfs_time", 
   event_var = "pfs_event", 
   test_var = "Sex", 
   analysis_name = "Sex", 
   filename = file.path(resultsDir, "Female_distribution.png"), 
+  covariates = NULL, 
+  interaction_var = NULL,
+  conf_int = 0.90)
+
+# Optimal cutpoint
+MARData_surv_cutpoiont(data = data, 
+  outcome = "PFS", 
+  time_var = "pfs_time", 
+  event_var = "pfs_event", 
+  test_var = "Age", 
+  analysis_name = "Age_optimal", 
+  filename = file.path(resultsDir, "Age_optimal_categorization.png"), 
   covariates = NULL, 
   interaction_var = NULL,
   conf_int = 0.90)
