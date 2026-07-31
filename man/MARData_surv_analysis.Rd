@@ -19,7 +19,10 @@ MARData_surv_analysis(
   custom_colors = default_colors,
   custom_linetypes = 1,
   break_time_by = NULL,
-  plot = TRUE
+  plot = TRUE,
+  width = 8, 
+  height = 6, 
+  res = 300
 )
 }
 \arguments{
