@@ -4,7 +4,7 @@
 \alias{analyze_survival}
 \title{Run Automated Survival Analysis, KM Plotting, and Cox Modeling}
 \usage{
-analyze_survival(
+MARData_surv_analysis(
   data,
   outcome = NA,
   time_var,
@@ -35,23 +35,28 @@ analyze_survival(
 
 \item{covariates}{Optional character vector of covariate column names for multivariable adjustment.}
 
-\item{interaction_var}{Optional character vector for interaction term testing.}
+\item{interaction_var}{Optional character vector for interaction term testing. The variable must be within the "covariates" variables as well.}
 
 \item{ref_level}{Optional character string specifying reference level for \code{test_var}.}
 
 \item{analysis_name}{Title label for the analysis and plot.}
 
-\item{filename}{File path/name for saving the KM plot PNG (default "KM.png").}
+\item{filename} File path/name for saving the KM plot (default "KM.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".}
 
 \item{conf_int}{Numeric confidence level (default 0.95).}
 
-\item{custom_colors}{Vector of hex color codes or color names for plot strata.}
+\item{custom_colors}{Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".}
 
-\item{custom_linetypes}{Vector of linetypes for plot strata.}
+\item{custom_linetypes}{Vector of linetypes for plot strata. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.}
 
 \item{break_time_by}{Step size for x-axis time breaks. Automatically calculated if NULL.}
 
 \item{plot}{Logical; whether to draw and export PNG plot (default TRUE).}
+
+\item{width}{Numeric; height of the plot to save, in inches (default 6).}
+
+\item{res}{Numeric; resolution of the plot to save (default 300).}
+
 }
 \value{
 A data.frame containing sample sizes, median survival with CIs,
