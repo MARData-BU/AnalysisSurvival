@@ -139,7 +139,7 @@ MARData_surv_cutpoint <- function(data, outcome = NA, time_var, event_var, test_
       fit_km, data = data, risk.table = TRUE, legend.title = "",
       break.time.by = if (is.null(break_time_by)) choose_break_time(max(data[[time_var]], na.rm = TRUE)) else break_time_by,
       fontsize = 3, title = analysis_name,
-      ggtheme = theme_classic2(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
+      ggtheme = theme_publish(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
       palette = custom_colors, linetype = custom_linetypes, legend = c(0.7, 0.9),
       linewidth = 1, surv.median.line = "hv", risk.table.height = 0.15,
       tables.theme = clean_theme(), break.y.by = 0.1, surv.scale = "percent", pval = FALSE
