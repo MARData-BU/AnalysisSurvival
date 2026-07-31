@@ -24,4 +24,5 @@ Imports:
     stats,
     survival,
     survminer,
-    tools
+    tools,
+    envalysis
