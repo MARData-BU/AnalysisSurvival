@@ -191,23 +191,9 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
         hjust = 0, vjust = 0, size = 3.5, fontface = "italic"
       )
     }
+    
+    save_survival_plot(p, filename, width = width, height = height, res = res)
 
-    ext <- tolower(tools::file_ext(filename))
-    raster_devices <- list(png = png, jpeg = jpeg, jpg = jpeg, tiff = tiff, bmp = bmp)
-    if (!(ext %in% c(names(raster_devices), "pdf", "svg"))) {
-      filename <- paste0(filename, ".png")
-      ext <- "png"
-    }
-
-    if (ext == "pdf") {
-      pdf(filename, width = width, height = height)
-    } else if (ext == "svg") {
-      svg(filename, width = width, height = height)
-    } else {
-      raster_devices[[ext]](filename, width = width, height = height, units = "in", res = res)
-    }
-    on.exit(dev.off(), add = TRUE)
-    print(p)
   }
 
   return(summary_results)
