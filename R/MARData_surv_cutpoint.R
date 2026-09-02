@@ -15,7 +15,7 @@
 #' @param interaction_var Optional character vector for interaction term testing. The variable must be within the "covariates" variables as well. 
 #' @param ref_level Optional character string specifying reference level for `test_var`.
 #' @param analysis_name Title label for the analysis and plot.
-#' @param filename File path/name for saving the KM plot (default "KM.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".
+#' @param filename File path/name for saving the KM plot (default "test_var_optimal_cutpoint.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".
 #' @param conf_int Numeric confidence level (default 0.95).
 #' @param custom_colors Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".
 #' @param custom_linetypes Vector of linetypes for plot strata as in ggsurvplot. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.
@@ -26,7 +26,7 @@
 #' @param height Numeric; height of the plot to save, in inches (default 6).
 #' @param res Numeric; resolution of the plot to save (default 300).
 #'
-#' @return A data.frame containing sample sizes, median survival with CIs, 
+#' @return A data.frame containing the optimal cutpoint considered, sample sizes, median survival with CIs, 
 #'   hazard ratios (HR/aHR) with CIs, log-rank p-values, proportional hazards test 
 #'   p-values, and interaction p-values.
 #' @export
