@@ -1,3 +1,15 @@
+fit_coxph_checked <- function(formula, data) {
+  conv_warnings <- character(0)
+  fit <- withCallingHandlers(
+    tryCatch(coxph(formula, data = data), error = function(e) NULL),
+    warning = function(w) {
+      conv_warnings <<- c(conv_warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  list(fit = fit, converged = length(conv_warnings) == 0, messages = conv_warnings)
+}
+
 get_km_medians <- function(surv_formula, data, conf_level = 0.95) {
   fit_km <- survfit(surv_formula, data = data, conf.type = "log-log", conf.int = conf_level)
   fit_km$call$formula <- surv_formula
@@ -68,12 +80,22 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
   # Full model: test_var + covariates
   all_vars <- unique(c(test_var, covariates))
   main_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, paste(all_vars, collapse = " + ")))
-  cox_main <- tryCatch(coxph(main_formula, data = data), error = function(e) NULL)
+  main_fit_result <- fit_coxph_checked(main_formula, data)
+  cox_main <- main_fit_result$fit
+                     
   if (is.null(cox_main)) {
     warning("Cox model failed to converge.")
     return(NULL)
   }
-  
+
+  if (!main_fit_result$converged) {
+    warning("Cox model for '", test_var, "' did not fully converge (",
+            paste(unique(main_fit_result$messages), collapse = "; "),
+            "). Resulting HR/CI estimates may be unstable or unreliable (e.g. due to ",
+            "quasi-complete separation, such as a stratum with very few events) - ",
+            "interpret with caution.")
+  }
+                     
   ph_test <- tryCatch(cox.zph(cox_main), error = function(e) NULL)
   global_ph_p <- "N/A"
   ph_by_term  <- character(0)
@@ -131,7 +153,14 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
       int_term <- paste0(test_var, " * ", int_v)
       rhs <- paste(c(int_term, other_covars), collapse = " + ")
       int_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, rhs))
-      cox_int <- tryCatch(coxph(int_formula, data = data), error = function(e) NULL)
+      int_fit_result <- fit_coxph_checked(int_formula, data)
+      cox_int <- int_fit_result$fit
+
+      if (!is.null(cox_int) && !int_fit_result$converged) {
+        warning("Cox model for the '", test_var, "' * '", int_v, "' interaction did not fully ",
+                "converge (", paste(unique(int_fit_result$messages), collapse = "; "),
+                "); the resulting interaction p-value may be unreliable - interpret with caution.")
+      }
       
       if (!is.null(cox_int)) {
         lrt <- anova(cox_main, cox_int, test = "LRT")
