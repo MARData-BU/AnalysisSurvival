@@ -1,7 +1,7 @@
 Package: AnalysisSurvival
 Type: Package
 Title: Automated Survival Analysis, Kaplan-Meier Plotting, and Cox Modeling
-Version: 0.3.0
+Version: 0.4.0
 Date: 2026-07-31
 Authors@R: c(
     person("Pau", "Berenguer-Molins", 
