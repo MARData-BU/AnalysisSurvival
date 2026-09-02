@@ -123,6 +123,12 @@ MARData_surv_cutpoint <- function(data, outcome = NA, time_var, event_var, test_
   )
   colnames(summary_results)[7] <- hr_col
 
+  warning("The cutpoint for '", test_var, "' (", round(cutpoint, 2), ") was selected to ",
+          "maximize group separation on this same dataset (optimal/minimum p-value approach); ",
+          "the reported p-value and HR are therefore biased towards significance. Treat this ",
+          "result as exploratory/hypothesis-generating rather than confirmatory, and ideally ",
+          "validate the cutpoint in an independent dataset before relying on it.", call. = FALSE)
+  
   if (plot) {
     n_curves <- max(n_strata, 1)
     if (n_curves > length(custom_colors)) {
