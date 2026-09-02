@@ -117,6 +117,13 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
   interaction_col <- rep("N/A", length(term_names))
   if (!is.null(interaction_var) && length(interaction_var) > 0) {
     valid_int_vars <- intersect(interaction_var, all_vars)
+
+    missing_int_vars <- setdiff(interaction_var, all_vars)
+    if (length(missing_int_vars) > 0) {
+      warning("Interaction variable(s) not in test_var/covariates and will be ignored: ",
+              paste(missing_int_vars, collapse = ", "))
+    }
+    
     test_var_pattern <- paste0("^", test_var)
     
     for (int_v in valid_int_vars) {
