@@ -27,3 +27,24 @@ choose_break_time <- function(max_time, n_breaks = 6) {
   if (!is.finite(step) || step <= 0) return(5)
   step
 }
+
+save_survival_plot <- function(p, filename, width = 8, height = 6, res = 300) {
+  ext <- tolower(tools::file_ext(filename))
+  raster_devices <- list(png = png, jpeg = jpeg, jpg = jpeg, tiff = tiff, bmp = bmp)
+  if (!(ext %in% c(names(raster_devices), "pdf", "svg"))) {
+    filename <- paste0(filename, ".png")
+    ext <- "png"
+  }
+ 
+  if (ext == "pdf") {
+    pdf(filename, width = width, height = height)
+  } else if (ext == "svg") {
+    svg(filename, width = width, height = height)
+  } else {
+    raster_devices[[ext]](filename, width = width, height = height, units = "in", res = res)
+  }
+  on.exit(dev.off(), add = TRUE)
+  print(p)
+ 
+  invisible(filename)
+}
