@@ -44,7 +44,9 @@ MARData_surv_analysis(
 
 \item{analysis_name}{Title label for the analysis and plot.}
 
-\item{filename}{File path/name for saving the KM plot (default "KM.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".}
+\item{imgname}{File path/name for saving the KM plot (default "KM.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".}
+
+\item{filename}{File path/name for saving the output table (default "table.csv"). Must have csv extension or no extension. }
 
 \item{conf_int}{Numeric confidence level (default 0.95).}
 
