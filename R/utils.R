@@ -48,3 +48,10 @@ save_survival_plot <- function(p, filename, width = 8, height = 6, res = 300) {
  
   invisible(filename)
 }
+
+save_summary_table <- function(df, filename) {
+  ext <- tolower(tools::file_ext(filename))
+  if (ext != "csv") filename <- paste0(filename, ".csv")
+  write.table(df, file = filename, sep = ",", row.names = FALSE, col.names = TRUE)
+  invisible(filename)
+}
