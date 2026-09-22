@@ -15,8 +15,9 @@
 #' @param interaction_var Optional character vector for interaction term testing. The variable must be within the "covariates" variables as well. 
 #' @param ref_level Optional character string specifying reference level for `test_var`.
 #' @param analysis_name Title label for the analysis and plot.
-#' @param filename File path/name for saving the KM plot (default "test_var_optimal_cutpoint.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".
+#' @param filename File path/name for saving the KM plot (default "KM.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".
 #' @param conf_int Numeric confidence level (default 0.95).
+#' @param conf_type Character; the confidence interval transformation passed to survfit()'s `conf.type` for both median survival and the plotted KM curves - one of "log-log" (default), "log" (survfit()'s own default when unspecified), "plain", or "logit". Different conf_type values give the same point estimates (median, HR) but different CIs - if you are comparing against a manual survfit() call that did not set conf.type, that call used "log", not this function's default of "log-log".
 #' @param custom_colors Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".
 #' @param custom_linetypes Vector of linetypes for plot strata as in ggsurvplot. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.
 #' @param break_time_by Step size for x-axis time breaks. Automatically calculated if NULL (default).
@@ -26,7 +27,7 @@
 #' @param height Numeric; height of the plot to save, in inches (default 6).
 #' @param res Numeric; resolution of the plot to save (default 300).
 #'
-#' @return A data.frame containing the optimal cutpoint considered, sample sizes, median survival with CIs, 
+#' @return A data.frame containing sample sizes, median survival with CIs, 
 #'   hazard ratios (HR/aHR) with CIs, log-rank p-values, proportional hazards test 
 #'   p-values, and interaction p-values.
 #' @export
@@ -34,7 +35,7 @@
 MARData_surv_cutpoint <- function(data, outcome = NA, time_var, event_var, test_var,
                                        covariates = c(), interaction_var = NULL, ref_level = NULL,
                                        analysis_name = NA, filename = paste0(test_var, "_optimal_cutpoint.png"),
-                                       conf_int = 0.95, custom_colors = default_colors,
+                                       conf_int = 0.95, conf_type = "log-log", custom_colors = default_colors,
                                        custom_linetypes = 1, break_time_by = NULL, minprop = 0.1,
                                        plot = TRUE, width = 8, height = 6, res = 300) {
 
@@ -78,10 +79,10 @@ MARData_surv_cutpoint <- function(data, outcome = NA, time_var, event_var, test_
   data <- set_ref_level(data, categ_col, ref_level)
 
   km_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, categ_col))
-  fit_km <- survfit(km_formula, data = data, conf.type = "log-log", conf.int = conf_int)
+  fit_km <- survfit(km_formula, data = data, conf.type = conf_type, conf.int = conf_int)
   fit_km$call$formula <- km_formula
 
-  df_medians <- get_km_medians(km_formula, data, conf_level = conf_int)
+  df_medians <- get_km_medians(km_formula, data, conf_level = conf_int, conf_type = conf_type)
   df_hrs <- get_cox_hrs(data, time_var, event_var, categ_col, covariates, interaction_var,
                         ref_level = NULL, conf_level = conf_int)
   if (is.null(df_hrs)) return(NULL)
@@ -128,7 +129,7 @@ MARData_surv_cutpoint <- function(data, outcome = NA, time_var, event_var, test_
           "the reported p-value and HR are therefore biased towards significance. Treat this ",
           "result as exploratory/hypothesis-generating rather than confirmatory, and ideally ",
           "validate the cutpoint in an independent dataset before relying on it.", call. = FALSE)
-  
+
   if (plot) {
     n_curves <- max(n_strata, 1)
     if (n_curves > length(custom_colors)) {
@@ -145,7 +146,7 @@ MARData_surv_cutpoint <- function(data, outcome = NA, time_var, event_var, test_
       fit_km, data = data, risk.table = TRUE, legend.title = "",
       break.time.by = if (is.null(break_time_by)) choose_break_time(max(data[[time_var]], na.rm = TRUE)) else break_time_by,
       fontsize = 3, title = analysis_name,
-      ggtheme = theme_publish(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
+      ggtheme = theme_classic2(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
       palette = custom_colors, linetype = custom_linetypes, legend = c(0.7, 0.9),
       linewidth = 1, surv.median.line = "hv", risk.table.height = 0.15,
       tables.theme = clean_theme(), break.y.by = 0.1, surv.scale = "percent", pval = FALSE
@@ -159,9 +160,7 @@ MARData_surv_cutpoint <- function(data, outcome = NA, time_var, event_var, test_
       )
     }
 
-    # Same filename-extension -> device logic as analyze_survival().
     save_survival_plot(p, filename, width = width, height = height, res = res)
-
   }
 
   return(summary_results)
