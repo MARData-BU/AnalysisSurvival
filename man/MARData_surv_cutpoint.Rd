@@ -16,6 +16,7 @@ MARData_surv_cutpoint(
   analysis_name = NA,
   filename = paste0(test_var, "_optimal_cutpoint.png"),
   conf_int = 0.95,
+  conf_type = "log-log",
   custom_colors = default_colors,
   custom_linetypes = 1,
   break_time_by = NULL,
@@ -38,6 +39,7 @@ MARData_surv_cutpoint(
 \item{analysis_name}{Title label for the analysis and plot.}
 \item{filename}{File path/name for saving the KM plot (default \code{paste0(test_var, "_optimal_cutpoint.png")}). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".}
 \item{conf_int}{Numeric confidence level (default 0.95).}
+\item{conf_type}{Character; the confidence interval transformation passed to survfit()'s `conf.type` for both median survival and the plotted KM curves - one of "log-log" (default), "log" (survfit()'s own default when unspecified), "plain", or "logit". Different conf_type values give the same point estimates (median, HR) but different CIs - if you are comparing against a manual survfit() call that did not set conf.type, that call used "log", not this function's default of "log-log".}
 \item{custom_colors}{Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".}
 \item{custom_linetypes}{Vector of linetypes for plot strata. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.}
 \item{break_time_by}{Step size for x-axis time breaks. Automatically calculated if NULL.}
