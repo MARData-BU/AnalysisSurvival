@@ -10,15 +10,15 @@ fit_coxph_checked <- function(formula, data) {
   list(fit = fit, converged = length(conv_warnings) == 0, messages = conv_warnings)
 }
 
-get_km_medians <- function(surv_formula, data, conf_level = 0.95) {
-  fit_km <- survfit(surv_formula, data = data, conf.type = "log-log", conf.int = conf_level)
+get_km_medians <- function(surv_formula, data, conf_level = 0.95, conf_type = "log-log") {
+  fit_km <- survfit(surv_formula, data = data, conf.type = conf_type, conf.int = conf_level)
   fit_km$call$formula <- surv_formula
   
   km_tab <- summary(fit_km)$table
   if (is.null(dim(km_tab))) {
     km_tab <- matrix(km_tab, nrow = 1, dimnames = list("Overall", names(km_tab)))
   }
-
+ 
   group_names <- gsub("^[^=]*=", "", rownames(km_tab))
   strata_counts <- if (!is.null(fit_km$strata)) fit_km$n else nrow(data)
   
