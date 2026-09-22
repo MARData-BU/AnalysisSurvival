@@ -17,6 +17,7 @@ MARData_surv_analysis(
   imgname = "KM.png",
   filename = "table.csv",
   conf_int = 0.95,
+  conf_type = "log-log",
   custom_colors = default_colors,
   custom_linetypes = 1,
   break_time_by = NULL,
@@ -50,6 +51,8 @@ MARData_surv_analysis(
 \item{filename}{File path/name for saving the output table (default "table.csv"). Must have csv extension or no extension. }
 
 \item{conf_int}{Numeric confidence level (default 0.95).}
+
+\item{conf_type}{Character; the confidence interval transformation passed to survfit()'s `conf.type` for both median survival and the plotted KM curves - one of "log-log" (default), "log" (survfit()'s own default when unspecified), "plain", or "logit". Different conf_type values give the same point estimates (median, HR) but different CIs - if you are comparing against a manual survfit() call that did not set conf.type, that call used "log", not this function's default of "log-log".}
 
 \item{custom_colors}{Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".}
 
