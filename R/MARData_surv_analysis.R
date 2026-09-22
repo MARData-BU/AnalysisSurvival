@@ -10,13 +10,14 @@
 #' @param time_var Character string specifying column name for time.
 #' @param event_var Character string specifying column name for event/status (0/1 - where 0 is censored and 1 event - or 1/2 - where 1 is censored and 2 is event -).
 #' @param test_var Character string specifying primary grouping variable(s) to test.
-#' @param covariates Optional character vector of covariate column names for multivariable adjustment.
-#' @param interaction_var Optional character vector for interaction term testing. The variable must be within the "covariates" variables as well. 
+#' @param covariates Optional character vector of covariate column names for multivariable adjustment. If `test_var` has length > 1 (combined grouping), any covariate that duplicates one of `test_var`'s components is dropped automatically (with a warning), since it is already fully captured by the combined grouping.
+#' @param interaction_var Optional character vector for interaction term testing. The variable must be within the "covariates" variables as well. If `test_var` has length > 1 (combined grouping), any interaction_var that duplicates one of `test_var`'s components is dropped automatically (with a warning): keeping it would otherwise give a degenerate interaction p-value of 1.
 #' @param ref_level Optional character string specifying reference level for `test_var`.
 #' @param analysis_name Title label for the analysis and plot.
 #' @param imgname File path/name for saving the KM plot (default "KM.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".
-#' @param filename File path/name for saving the output table (default "table.csv"). Must have csv extension or no extension. 
+#' @param filename File path/name for saving the summary table as CSV (default "table.csv"). An extension other than ".csv" (or none) will have ".csv" appended.
 #' @param conf_int Numeric confidence level (default 0.95).
+#' @param conf_type Character; the confidence interval transformation passed to survfit()'s `conf.type` for both median survival and the plotted KM curves - one of "log-log" (default), "log" (survfit()'s own default when unspecified), "plain", or "logit". Different conf_type values give the same point estimates (median, HR) but different CIs - if you are comparing against a manual survfit() call that did not set conf.type, that call used "log", not this function's default of "log-log".
 #' @param custom_colors Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".
 #' @param custom_linetypes Vector of linetypes for plot strata as in ggsurvplot. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.
 #' @param break_time_by Step size for x-axis time breaks. Automatically calculated if NULL (default).
@@ -32,19 +33,19 @@
 #'   test comparing an additive model to a fully crossed one, testing for an interaction
 #'   among the test_var components themselves (N/A when `test_var` has length 1).
 #' @export
- 
+
 MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_var,
                               covariates = c(), interaction_var = NULL,
                               ref_level = NULL, analysis_name = NA, imgname = "KM.png", filename = "table.csv",
-                              conf_int = 0.95, custom_colors = default_colors,
+                              conf_int = 0.95, conf_type = "log-log", custom_colors = default_colors,
                               custom_linetypes = 1, break_time_by = NULL,
                               plot = TRUE, width = 8, height = 6, res = 300) {
- 
+
   data[[time_var]]  <- as.numeric(data[[time_var]])
   data[[event_var]] <- as.numeric(data[[event_var]])
   is_combined_test_var <- length(test_var) > 1
   testvar_interaction_p <- "N/A"
- 
+
   if (is_combined_test_var) {
     for (v in test_var) {
       if (is.numeric(data[[v]]) && length(unique(stats::na.omit(data[[v]]))) > 10) {
@@ -54,15 +55,15 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
     }
     combo_name <- paste(test_var, collapse = "_x_")
     while (combo_name %in% names(data)) combo_name <- paste0(combo_name, "_")
- 
+
     labeled_parts <- lapply(test_var, function(v) paste(v, as.character(data[[v]])))
     combo_vals <- do.call(paste, c(labeled_parts, list(sep = " + ")))
     # A row with a missing value in ANY of the component variables must stay NA in the combined column too
     any_na <- Reduce(`|`, lapply(test_var, function(v) is.na(data[[v]])))
     combo_vals[any_na] <- NA
- 
+
     data[[combo_name]] <- droplevels(factor(combo_vals))
- 
+
     # Safeguard: a variable that is one of the combined test_var components is
     # fully redundant if it is ALSO listed in covariates/interaction_var - the
     # combined grouping already encodes its value for every row. Leaving it in
@@ -78,7 +79,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
               paste(dup_covariates, collapse = ", "))
       covariates <- setdiff(covariates, dup_covariates)
     }
- 
+
     dup_interaction <- intersect(interaction_var, test_var)
     if (length(dup_interaction) > 0) {
       warning("Variable(s) also present in the combined test_var, so removed from 'interaction_var' ",
@@ -87,7 +88,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
       interaction_var <- setdiff(interaction_var, dup_interaction)
       if (length(interaction_var) == 0) interaction_var <- NULL
     }
- 
+
     # Formal interaction test between the test_var components themselves
     # (distinct from P_for_Interaction, which tests the combined test_var
     # against an external interaction_var): compares an additive model to a
@@ -101,7 +102,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
                                         paste(c(paste(test_var, collapse = " * "), covariates), collapse = " + ")))
     fit_add  <- fit_coxph_checked(add_formula, data)
     fit_full <- fit_coxph_checked(full_formula, data)
- 
+
     if (is.null(fit_add$fit) || is.null(fit_full$fit)) {
       warning("Could not fit the additive/full models needed to test for an interaction among ",
               "the test_var components; P_for_TestVar_Interaction will be N/A.")
@@ -116,13 +117,13 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
         testvar_interaction_p <- if (p_int < 0.001) "<0.001" else sprintf("%.4f", p_int)
       }
     }
- 
+
     test_var <- combo_name
   }
- 
+
   # A numeric test_var is treated as continuous: no KM curves, no median survival, and no plot - only a Cox model with test_var as a continuous predictor.
   test_var_is_numeric <- is.numeric(data[[test_var]])
- 
+
   if (test_var_is_numeric) {
     if (!is.null(ref_level)) {
       warning("ref_level is ignored because '", test_var, "' is numeric (continuous); ",
@@ -131,32 +132,32 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
   } else {
     data <- set_ref_level(data, test_var, ref_level)
   }
- 
+
   for (v in covariates) {
     if (is.character(data[[v]]) || is.factor(data[[v]])) data[[v]] <- as.factor(data[[v]])
   }
- 
+
   model_cols <- c(time_var, event_var, test_var, covariates)
   data <- data[complete.cases(data[, model_cols, drop = FALSE]), ]
- 
+
   if (nrow(data) == 0) {
     message(paste("Skipping analysis:", analysis_name, "- Data is empty (or no complete cases)."))
     return(NULL)
   }
- 
+
   # ============================================================
   # Numeric test_var: Cox model only. 
   # ============================================================
   if (test_var_is_numeric) {
     message("'", test_var, "' is numeric: fitting a Cox model only - ",
             "Kaplan-Meier curves, median survival, and the plot do not apply to a continuous variable.")
- 
+
     df_hrs <- get_cox_hrs(data, time_var, event_var, test_var, covariates, interaction_var,
                           ref_level = NULL, conf_level = conf_int)
     if (is.null(df_hrs)) return(NULL)
- 
+
     hr_col <- grep("^a?HR_.*CI$", colnames(df_hrs), value = TRUE)[1]
- 
+
     summary_results <- data.frame(
       Scenario            = analysis_name,
       Outcome             = outcome,
@@ -178,21 +179,21 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
     save_summary_table(summary_results, filename)
     return(summary_results)
   }
- 
+
   # ============================================================
   # Categorical test_var (factor/character): existing KM + Cox + plot
   # ============================================================
   km_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, test_var))
-  fit_km <- survfit(km_formula, data = data, conf.type = "log-log", conf.int = conf_int)
+  fit_km <- survfit(km_formula, data = data, conf.type = conf_type, conf.int = conf_int)
   fit_km$call$formula <- km_formula
- 
-  df_medians <- get_km_medians(km_formula, data, conf_level = conf_int)
+
+  df_medians <- get_km_medians(km_formula, data, conf_level = conf_int, conf_type = conf_type)
   df_hrs <- get_cox_hrs(data, time_var, event_var, test_var, covariates, interaction_var,
                         ref_level = ref_level, conf_level = conf_int)
   if (is.null(df_hrs)) return(NULL)
- 
+
   df_stats <- merge(df_medians, df_hrs, by = "Group", all.y = TRUE)
- 
+
   n_strata <- length(fit_km$strata)
   if (n_strata > 1) {
     surv_diff <- survdiff(km_formula, data = data)
@@ -201,10 +202,10 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
   } else {
     overall_p_str <- "N/A"
   }
- 
+
   med_col <- grep("^Median_Survival", colnames(df_stats), value = TRUE)[1]
   hr_col  <- grep("^a?HR_.*CI$", colnames(df_stats), value = TRUE)[1]
- 
+
   summary_results <- data.frame(
     Scenario           = analysis_name,
     Outcome            = outcome,
@@ -223,7 +224,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
     stringsAsFactors   = FALSE
   )
   colnames(summary_results)[7] <- hr_col
- 
+
   if (plot) {
     n_curves <- max(n_strata, 1)
     if (n_curves > length(custom_colors)) {
@@ -235,7 +236,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
       message("The number of strata is ", n_curves, " but the number of linetypes set is ", length(custom_linetypes))
       return(NULL)
     }
- 
+
     p <- ggsurvplot(
       fit_km, data = data, risk.table = TRUE, legend.title = "",
       legend.labs = if (is_combined_test_var) levels(droplevels(as.factor(data[[test_var]]))) else NULL,
@@ -246,7 +247,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
       linewidth = 1, surv.median.line = "hv", risk.table.height = 0.15,
       tables.theme = clean_theme(), break.y.by = 0.1, surv.scale = "percent", pval = FALSE
     )
- 
+
     annot_text <- generate_surv_annotation(km_formula, data, df_hrs, test_var, conf_level = conf_int)
     if (!is.null(annot_text)) {
       p$plot <- p$plot + ggplot2::annotate(
@@ -254,10 +255,10 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
         hjust = 0, vjust = 0, size = 3.5, fontface = "italic"
       )
     }
- 
+
     save_survival_plot(p, imgname, width = width, height = height, res = res)
   }
- 
+
   save_summary_table(summary_results, filename)
   return(summary_results)
 }
