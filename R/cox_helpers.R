@@ -82,12 +82,10 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
   main_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, paste(all_vars, collapse = " + ")))
   main_fit_result <- fit_coxph_checked(main_formula, data)
   cox_main <- main_fit_result$fit
-                     
   if (is.null(cox_main)) {
     warning("Cox model failed to converge.")
     return(NULL)
   }
-
   if (!main_fit_result$converged) {
     warning("Cox model for '", test_var, "' did not fully converge (",
             paste(unique(main_fit_result$messages), collapse = "; "),
@@ -95,7 +93,7 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
             "quasi-complete separation, such as a stratum with very few events) - ",
             "interpret with caution.")
   }
-                     
+  
   ph_test <- tryCatch(cox.zph(cox_main), error = function(e) NULL)
   global_ph_p <- "N/A"
   ph_by_term  <- character(0)
@@ -114,7 +112,7 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
     names(ph_by_term) <- term_rows
   }
   
-  cox_sum    <- summary(cox_main)
+  cox_sum    <- summary(cox_main, conf.int = conf_level)
   coef_mat   <- cox_sum$coefficients
   term_names <- rownames(coef_mat)
   hrs        <- as.vector(coef_mat[, "exp(coef)"])
@@ -123,7 +121,7 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
   
   formatted_hrs <- sprintf("%.2f (%.2f-%.2f)", hrs, cis[, 1], cis[, 2])
   formatted_p   <- ifelse(p_vals < 0.001, "<0.001", sprintf("%.3f", p_vals))
-
+ 
   vars_by_length <- all_vars[order(-nchar(all_vars))]
   owner_var <- vapply(term_names, function(tn) {
     if (tn %in% all_vars) return(tn)
@@ -139,13 +137,13 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
   interaction_col <- rep("N/A", length(term_names))
   if (!is.null(interaction_var) && length(interaction_var) > 0) {
     valid_int_vars <- intersect(interaction_var, all_vars)
-
+ 
     missing_int_vars <- setdiff(interaction_var, all_vars)
     if (length(missing_int_vars) > 0) {
       warning("Interaction variable(s) not in test_var/covariates and will be ignored: ",
               paste(missing_int_vars, collapse = ", "))
     }
-    
+ 
     test_var_pattern <- paste0("^", test_var)
     
     for (int_v in valid_int_vars) {
@@ -155,7 +153,6 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
       int_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, rhs))
       int_fit_result <- fit_coxph_checked(int_formula, data)
       cox_int <- int_fit_result$fit
-
       if (!is.null(cox_int) && !int_fit_result$converged) {
         warning("Cox model for the '", test_var, "' * '", int_v, "' interaction did not fully ",
                 "converge (", paste(unique(int_fit_result$messages), collapse = "; "),
