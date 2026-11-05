@@ -26,7 +26,8 @@
 #' @param height Numeric; height of the plot to save, in inches (default 6).
 #' @param res Numeric; resolution of the plot to save (default 300).
 #'
-#' @return A data.frame containing sample sizes, median survival with CIs, 
+#' @return A data.frame containing sample sizes (N) and number of events (N_events) per group
+#'   (for a numeric `test_var`, the total N and total events of the model), median survival with CIs, 
 #'   hazard ratios (HR/aHR) with CIs, log-rank p-values, proportional hazards test 
 #'   p-values, P_for_Interaction (test between test_var and an external interaction_var),
 #'   and, when `test_var` has length > 1, P_for_TestVar_Interaction - a likelihood-ratio
@@ -164,6 +165,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
       Variable_Term       = df_hrs$Term,
       Group               = df_hrs$Group,
       N                   = nrow(data),
+      N_events            = sum(Surv(data[[time_var]], data[[event_var]])[, "status"]),
       Median_Survival     = NA_character_,
       HR_CI               = df_hrs[[hr_col]],
       P_Value             = df_hrs$P_Value,
@@ -175,7 +177,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
       Adjusted_For        = if (length(covariates) > 0) paste(covariates, collapse = ", ") else "Unadjusted (univariate)",
       stringsAsFactors    = FALSE
     )
-    colnames(summary_results)[7] <- hr_col
+    colnames(summary_results)[colnames(summary_results) == "HR_CI"] <- hr_col
     save_summary_table(summary_results, filename)
     return(summary_results)
   }
@@ -188,6 +190,17 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
   fit_km$call$formula <- km_formula
 
   df_medians <- get_km_medians(km_formula, data, conf_level = conf_int, conf_type = conf_type)
+
+  # Events per group, read from the same survfit table that provides N/median
+  # (so it follows survival's own event coding: 0/1 or 1/2). Attached by
+  # matching on Group - not merged - so the row order of df_medians is kept.
+  km_tab <- summary(fit_km)$table
+  if (is.null(dim(km_tab))) {
+    km_tab <- matrix(km_tab, nrow = 1, dimnames = list("Overall", names(km_tab)))
+  }
+  km_groups <- gsub("^[^=]*=", "", rownames(km_tab))
+  df_medians$N_events <- as.vector(km_tab[, "events"])[match(df_medians$Group, km_groups)]
+
   df_hrs <- get_cox_hrs(data, time_var, event_var, test_var, covariates, interaction_var,
                         ref_level = ref_level, conf_level = conf_int)
   if (is.null(df_hrs)) return(NULL)
@@ -212,6 +225,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
     Variable_Term      = df_stats$Term,
     Group              = df_stats$Group,
     N                  = df_stats$N,
+    N_events           = df_stats$N_events,
     Median_Survival    = df_stats[[med_col]],
     HR_CI              = df_stats[[hr_col]],
     P_Value            = df_stats$P_Value,
@@ -223,7 +237,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
     Adjusted_For       = if (length(covariates) > 0) paste(covariates, collapse = ", ") else "Unadjusted (univariate)",
     stringsAsFactors   = FALSE
   )
-  colnames(summary_results)[7] <- hr_col
+  colnames(summary_results)[colnames(summary_results) == "HR_CI"] <- hr_col
 
   if (plot) {
     n_curves <- max(n_strata, 1)
