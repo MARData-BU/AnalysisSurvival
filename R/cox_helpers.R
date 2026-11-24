@@ -1,7 +1,7 @@
 fit_coxph_checked <- function(formula, data) {
   conv_warnings <- character(0)
   fit <- withCallingHandlers(
-    tryCatch(coxph(formula, data = data), error = function(e) NULL),
+    tryCatch(survival::coxph(formula, data = data), error = function(e) NULL),
     warning = function(w) {
       conv_warnings <<- c(conv_warnings, conditionMessage(w))
       invokeRestart("muffleWarning")
@@ -11,7 +11,7 @@ fit_coxph_checked <- function(formula, data) {
 }
 
 get_km_medians <- function(surv_formula, data, conf_level = 0.95, conf_type = "log-log") {
-  fit_km <- survfit(surv_formula, data = data, conf.type = conf_type, conf.int = conf_level)
+  fit_km <- survival::survfit(surv_formula, data = data, conf.type = conf_type, conf.int = conf_level)
   fit_km$call$formula <- surv_formula
   
   km_tab <- summary(fit_km)$table
@@ -62,8 +62,8 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
   ci_label <- paste0(if (is_adjusted) "aHR_" else "HR_", round(conf_level * 100), "CI")
   
   if (!test_var_is_numeric) {
-    km_formula_test <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, test_var))
-    fit_km <- survfit(km_formula_test, data = data)
+    km_formula_test <- stats::as.formula(sprintf("survival::Surv(%s, %s) ~ %s", time_var, event_var, test_var))
+    fit_km <- survival::survfit(km_formula_test, data = data)
     n_strata <- length(fit_km$strata)
     
     if (n_strata <= 1) {
@@ -79,7 +79,7 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
   
   # Full model: test_var + covariates
   all_vars <- unique(c(test_var, covariates))
-  main_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, paste(all_vars, collapse = " + ")))
+  main_formula <- stats::as.formula(sprintf("survival::Surv(%s, %s) ~ %s", time_var, event_var, paste(all_vars, collapse = " + ")))
   main_fit_result <- fit_coxph_checked(main_formula, data)
   cox_main <- main_fit_result$fit
   if (is.null(cox_main)) {
@@ -94,14 +94,14 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
             "interpret with caution.")
   }
   
-  ph_test <- tryCatch(cox.zph(cox_main), error = function(e) NULL)
+  ph_test <- tryCatch(survival::cox.zph(cox_main), error = function(e) NULL)
   global_ph_p <- "N/A"
   ph_by_term  <- character(0)
   
   if (!is.null(ph_test)) {
     ph_tab <- ph_test$table
     if (any(ph_tab[, "p"] < 0.05, na.rm = TRUE)) {
-      warning("The Proportional Hazards assumption is not met for at least one term. Please review cox.zph() output.")
+      warning("The Proportional Hazards assumption is not met for at least one term. Please review survival::cox.zph() output.")
     }
     if ("GLOBAL" %in% rownames(ph_tab)) {
       g_p <- ph_tab["GLOBAL", "p"]
@@ -150,7 +150,7 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
       other_covars <- setdiff(covariates, int_v)
       int_term <- paste0(test_var, " * ", int_v)
       rhs <- paste(c(int_term, other_covars), collapse = " + ")
-      int_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, rhs))
+      int_formula <- stats::as.formula(sprintf("survival::Surv(%s, %s) ~ %s", time_var, event_var, rhs))
       int_fit_result <- fit_coxph_checked(int_formula, data)
       cox_int <- int_fit_result$fit
       if (!is.null(cox_int) && !int_fit_result$converged) {
@@ -160,7 +160,7 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
       }
       
       if (!is.null(cox_int)) {
-        lrt <- anova(cox_main, cox_int, test = "LRT")
+        lrt <- stats::anova(cox_main, cox_int, test = "LRT")
         p_int <- lrt$`Pr(>|Chi|)`[2]
         if (!is.na(p_int)) {
           p_int_str <- if (p_int < 0.001) "<0.001" else sprintf("%.4f", p_int)
@@ -207,12 +207,12 @@ get_cox_hrs <- function(data, time_var, event_var, test_var,
 }
 
 generate_surv_annotation <- function(km_formula, data, cox_df, test_var, conf_level = 0.95) {
-  fit_km <- survfit(km_formula, data = data)
+  fit_km <- survival::survfit(km_formula, data = data)
   n_strata <- length(fit_km$strata)
   if (n_strata == 0) return(NULL)
   
-  surv_diff <- survdiff(km_formula, data = data)
-  p_val <- pchisq(surv_diff$chisq, df = length(surv_diff$n) - 1, lower.tail = FALSE)
+  surv_diff <- survival::survdiff(km_formula, data = data)
+  p_val <- stats::pchisq(surv_diff$chisq, df = length(surv_diff$n) - 1, lower.tail = FALSE)
   p_str <- if (p_val < 0.001) "Log-rank p < 0.001" else sprintf("Log-rank p = %.4f", p_val)
   
   hr_col <- grep("^a?HR_.*CI$", colnames(cox_df), value = TRUE)[1]
