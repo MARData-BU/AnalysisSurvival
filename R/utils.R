@@ -16,7 +16,7 @@ set_ref_level <- function(data, test_var, ref_level = NULL) {
       stop(sprintf("Level %s is not in variable %s; the available levels are %s",
                    ref_level, test_var, format_level_list(lv)), call. = FALSE)
     }
-    data[[test_var]] <- relevel(data[[test_var]], ref = ref_level)
+    data[[test_var]] <- stats::relevel(data[[test_var]], ref = ref_level)
   }
   data
 }
@@ -28,23 +28,26 @@ choose_break_time <- function(max_time, n_breaks = 6) {
   step
 }
 
-save_survival_plot <- function(p, filename, width = 8, height = 6, res = 300) {
+save_survival_plot <- function(p, filename, width = 8, height = 6, res = 300,
+                               annotation = NULL,
+                               annotation_position = c(x = 0.14, y = 0.42)) {
   ext <- tolower(tools::file_ext(filename))
-  raster_devices <- list(png = png, jpeg = jpeg, jpg = jpeg, tiff = tiff, bmp = bmp)
+  raster_devices <- list(png = grDevices::png, jpeg = grDevices::jpeg, jpg = grDevices::jpeg, tiff = grDevices::tiff, bmp = grDevices::bmp)
   if (!(ext %in% c(names(raster_devices), "pdf", "svg"))) {
     filename <- paste0(filename, ".png")
     ext <- "png"
   }
  
   if (ext == "pdf") {
-    pdf(filename, width = width, height = height)
+    grDevices::pdf(filename, width = width, height = height)
   } else if (ext == "svg") {
-    svg(filename, width = width, height = height)
+    grDevices::svg(filename, width = width, height = height)
   } else {
     raster_devices[[ext]](filename, width = width, height = height, units = "in", res = res)
   }
-  on.exit(dev.off(), add = TRUE)
+  on.exit(grDevices::dev.off(), add = TRUE)
   print(p)
+  if (!is.null(annotation)) draw_survival_annotation(annotation, annotation_position, width, height)
  
   invisible(filename)
 }
@@ -52,6 +55,6 @@ save_survival_plot <- function(p, filename, width = 8, height = 6, res = 300) {
 save_summary_table <- function(df, filename) {
   ext <- tolower(tools::file_ext(filename))
   if (ext != "csv") filename <- paste0(filename, ".csv")
-  write.table(df, file = filename, sep = ",", row.names = FALSE, col.names = TRUE)
+  utils::write.table(df, file = filename, sep = ",", row.names = FALSE, col.names = TRUE)
   invisible(filename)
 }
