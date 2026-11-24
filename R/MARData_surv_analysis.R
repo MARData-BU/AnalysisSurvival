@@ -17,7 +17,7 @@
 #' @param imgname File path/name for saving the KM plot (default "KM.png"). Must have an available extension among png, pdf, jpeg, jpg, tiff, bmp or svg. An unrecognized or missing extension will fall back to ".png".
 #' @param filename File path/name for saving the summary table as CSV (default "table.csv"). An extension other than ".csv" (or none) will have ".csv" appended.
 #' @param conf_int Numeric confidence level (default 0.95).
-#' @param conf_type Character; the confidence interval transformation passed to survfit()'s `conf.type` for both median survival and the plotted KM curves - one of "log-log" (default), "log" (survfit()'s own default when unspecified), "plain", or "logit". Different conf_type values give the same point estimates (median, HR) but different CIs - if you are comparing against a manual survfit() call that did not set conf.type, that call used "log", not this function's default of "log-log".
+#' @param conf_type Character; the confidence interval transformation passed to survival::survfit()'s `conf.type` for both median survival and the plotted KM curves - one of "log-log" (default), "log" (survival::survfit()'s own default when unspecified), "plain", or "logit". Different conf_type values give the same point estimates (median, HR) but different CIs - if you are comparing against a manual survival::survfit() call that did not set conf.type, that call used "log", not this function's default of "log-log".
 #' @param custom_colors Vector of hex color codes or color names for plot strata. Default colours are "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#E6AB02" and "#66A61E".
 #' @param custom_linetypes Vector of linetypes for plot strata as in ggsurvplot. Default is 1 (solid). If the same linetype is applied to all strata, the specific linetype can only be specified once.
 #' @param break_time_by Step size for x-axis time breaks. Automatically calculated if NULL (default).
@@ -26,6 +26,19 @@
 #' @param height Numeric; height of the plot to save, in inches (default 6).
 #' @param res Numeric; resolution of the plot to save (default 300).
 #'
+#' @param return_details If TRUE, return a list containing the raw summary, cached
+#'   plot, annotation grob, group key and presentation arguments. Default FALSE
+#'   preserves the data.frame return type and machine-readable column names.
+#' @param group_labels Optional display labels, in fitted-stratum order or named
+#'   by exact original group values. Never changes factor levels or contrasts.
+#' @param variable_labels Optional named mapping from internal variable names to display names.
+#' @param legend_font_size Legend text size in points.
+#' @param legend_ncol Number of legend columns; NULL or 0 selects automatically.
+#' @param legend_wrap_width Maximum approximate characters per legend line.
+#' @param risk_table_labels Use "group_id" (default) or short "label" row labels.
+#' @param annotation_position Normalised c(x, y) position of the annotation's
+#'   top-left corner, measured from the top-left of the ENTIRE exported figure.
+#' @param annotation_font_size Statistics-box font size in points.
 #' @return A data.frame containing sample sizes (N) and number of events (N_events) per group
 #'   (for a numeric `test_var`, the total N and total events of the model), median survival with CIs, 
 #'   hazard ratios (HR/aHR) with CIs, log-rank p-values, proportional hazards test 
@@ -40,7 +53,14 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
                               ref_level = NULL, analysis_name = NA, imgname = "KM.png", filename = "table.csv",
                               conf_int = 0.95, conf_type = "log-log", custom_colors = default_colors,
                               custom_linetypes = 1, break_time_by = NULL,
-                              plot = TRUE, width = 8, height = 6, res = 300) {
+                              plot = TRUE, width = 8, height = 6, res = 300,
+                              return_details = FALSE, group_labels = NULL, variable_labels = NULL,
+                              legend_font_size = 9, legend_ncol = NULL, legend_wrap_width = 28,
+                              risk_table_labels = "group_id",
+                              annotation_position = c(x = 0.14, y = 0.42),
+                              annotation_font_size = 9) {
+
+  original_test_vars <- test_var
 
   data[[time_var]]  <- as.numeric(data[[time_var]])
   data[[event_var]] <- as.numeric(data[[event_var]])
@@ -97,9 +117,9 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
     # combined factor - a saturated combined factor and "a * b" span the same
     # design space (same overall fit), but only "a * b" decomposes that into
     # a testable interaction term rather than K-1 cell-vs-reference contrasts.
-    add_formula  <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var,
+    add_formula  <- stats::as.formula(sprintf("survival::Surv(%s, %s) ~ %s", time_var, event_var,
                                         paste(c(test_var, covariates), collapse = " + ")))
-    full_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var,
+    full_formula <- stats::as.formula(sprintf("survival::Surv(%s, %s) ~ %s", time_var, event_var,
                                         paste(c(paste(test_var, collapse = " * "), covariates), collapse = " + ")))
     fit_add  <- fit_coxph_checked(add_formula, data)
     fit_full <- fit_coxph_checked(full_formula, data)
@@ -112,7 +132,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
         warning("Cox model(s) for the test_var interaction test did not fully converge; ",
                 "P_for_TestVar_Interaction may be unreliable - interpret with caution.")
       }
-      lrt <- tryCatch(anova(fit_add$fit, fit_full$fit, test = "LRT"), error = function(e) NULL)
+      lrt <- tryCatch(stats::anova(fit_add$fit, fit_full$fit, test = "LRT"), error = function(e) NULL)
       p_int <- if (!is.null(lrt)) lrt$`Pr(>|Chi|)`[2] else NA
       if (!is.na(p_int)) {
         testvar_interaction_p <- if (p_int < 0.001) "<0.001" else sprintf("%.4f", p_int)
@@ -139,7 +159,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
   }
 
   model_cols <- c(time_var, event_var, test_var, covariates)
-  data <- data[complete.cases(data[, model_cols, drop = FALSE]), ]
+  data <- data[stats::complete.cases(data[, model_cols, drop = FALSE]), ]
 
   if (nrow(data) == 0) {
     message(paste("Skipping analysis:", analysis_name, "- Data is empty (or no complete cases)."))
@@ -165,7 +185,7 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
       Variable_Term       = df_hrs$Term,
       Group               = df_hrs$Group,
       N                   = nrow(data),
-      N_events            = sum(Surv(data[[time_var]], data[[event_var]])[, "status"]),
+      N_events            = sum(survival::Surv(data[[time_var]], data[[event_var]])[, "status"]),
       Median_Survival     = NA_character_,
       HR_CI               = df_hrs[[hr_col]],
       P_Value             = df_hrs$P_Value,
@@ -179,14 +199,20 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
     )
     colnames(summary_results)[colnames(summary_results) == "HR_CI"] <- hr_col
     save_summary_table(summary_results, filename)
+    if (isTRUE(return_details)) return(list(
+      summary = summary_results, plot = NULL, annotation = NULL, group_key = NULL,
+      plot_args = NULL, annotation_args = NULL, main_term = test_var,
+      component_vars = original_test_vars, conf_int = conf_int, width = width, height = height,
+      annotation_position = annotation_position
+    ))
     return(summary_results)
   }
 
   # ============================================================
   # Categorical test_var (factor/character): existing KM + Cox + plot
   # ============================================================
-  km_formula <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_var, event_var, test_var))
-  fit_km <- survfit(km_formula, data = data, conf.type = conf_type, conf.int = conf_int)
+  km_formula <- stats::as.formula(sprintf("survival::Surv(%s, %s) ~ %s", time_var, event_var, test_var))
+  fit_km <- survival::survfit(km_formula, data = data, conf.type = conf_type, conf.int = conf_int)
   fit_km$call$formula <- km_formula
 
   df_medians <- get_km_medians(km_formula, data, conf_level = conf_int, conf_type = conf_type)
@@ -209,8 +235,8 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
 
   n_strata <- length(fit_km$strata)
   if (n_strata > 1) {
-    surv_diff <- survdiff(km_formula, data = data)
-    overall_p <- pchisq(surv_diff$chisq, df = length(surv_diff$n) - 1, lower.tail = FALSE)
+    surv_diff <- survival::survdiff(km_formula, data = data)
+    overall_p <- stats::pchisq(surv_diff$chisq, df = length(surv_diff$n) - 1, lower.tail = FALSE)
     overall_p_str <- if (overall_p < 0.001) "<0.001" else sprintf("%.4f", overall_p)
   } else {
     overall_p_str <- "N/A"
@@ -218,6 +244,9 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
 
   med_col <- grep("^Median_Survival", colnames(df_stats), value = TRUE)[1]
   hr_col  <- grep("^a?HR_.*CI$", colnames(df_stats), value = TRUE)[1]
+
+  covariate_rows <- !is.na(df_stats$Term) & df_stats$Term != test_var
+  df_stats[covariate_rows, c("N", "N_events", med_col)] <- NA
 
   summary_results <- data.frame(
     Scenario           = analysis_name,
@@ -239,40 +268,41 @@ MARData_surv_analysis <- function(data, outcome = NA, time_var, event_var, test_
   )
   colnames(summary_results)[colnames(summary_results) == "HR_CI"] <- hr_col
 
-  if (plot) {
-    n_curves <- max(n_strata, 1)
-    if (n_curves > length(custom_colors)) {
-      custom_colors <- grDevices::colorRampPalette(custom_colors)(n_curves)
-    }
-    if (length(custom_linetypes) == 1) {
-      custom_linetypes <- rep(custom_linetypes, n_curves)
-    } else if (length(custom_linetypes) < n_curves) {
-      message("The number of strata is ", n_curves, " but the number of linetypes set is ", length(custom_linetypes))
-      return(NULL)
-    }
-
-    p <- ggsurvplot(
-      fit_km, data = data, risk.table = TRUE, legend.title = "",
-      legend.labs = if (is_combined_test_var) levels(droplevels(as.factor(data[[test_var]]))) else NULL,
-      break.time.by = if (is.null(break_time_by)) choose_break_time(max(data[[time_var]], na.rm = TRUE)) else break_time_by,
-      fontsize = 3, title = analysis_name,
-      ggtheme = theme_classic2(), xlab = "Time (months)", ylab = paste(outcome, "(%)"),
-      palette = custom_colors, linetype = custom_linetypes, legend = c(0.7, 0.9),
-      linewidth = 1, surv.median.line = "hv", risk.table.height = 0.15,
-      tables.theme = clean_theme(), break.y.by = 0.1, surv.scale = "percent", pval = FALSE
+  p <- NULL
+  key <- NULL
+  annotation <- NULL
+  plot_args <- NULL
+  annotation_args <- NULL
+  if (isTRUE(plot) || isTRUE(return_details)) {
+    key <- make_survival_group_key(fit_km, data, test_var, original_test_vars,
+                                  group_labels, variable_labels)
+    plot_args <- list(
+      fit_km = fit_km, data = data, group_key = key,
+      analysis_name = analysis_name, outcome = outcome,
+      custom_colors = custom_colors, custom_linetypes = custom_linetypes,
+      break_time_by = break_time_by, time_var = time_var,
+      legend_font_size = legend_font_size, legend_ncol = legend_ncol,
+      legend_wrap_width = legend_wrap_width, risk_table_labels = risk_table_labels,
+      width = width, height = height
     )
-
-    annot_text <- generate_surv_annotation(km_formula, data, df_hrs, test_var, conf_level = conf_int)
-    if (!is.null(annot_text)) {
-      p$plot <- p$plot + ggplot2::annotate(
-        "text", x = 1, y = 0.15, label = annot_text,
-        hjust = 0, vjust = 0, size = 3.5, fontface = "italic"
-      )
-    }
-
-    save_survival_plot(p, imgname, width = width, height = height, res = res)
+    p <- do.call(build_survival_plot, plot_args)
+    annotation_args <- list(
+      cox_df = df_hrs, test_var = test_var, group_key = key, overall_p = overall_p_str,
+      conf_int = conf_int, component_interaction_p = testvar_interaction_p,
+      font_size = annotation_font_size
+    )
+    annotation <- do.call(make_survival_annotation, annotation_args)
+    annotation_position <- normalise_annotation_position(annotation_position, annotation, width, height)
+    if (isTRUE(plot)) save_survival_plot(p, imgname, width = width, height = height, res = res,
+                                       annotation = annotation, annotation_position = annotation_position)
   }
 
   save_summary_table(summary_results, filename)
+  if (isTRUE(return_details)) return(list(
+    summary = summary_results, plot = p, annotation = annotation, group_key = key,
+    plot_args = plot_args, annotation_args = annotation_args, main_term = test_var,
+    component_vars = original_test_vars, conf_int = conf_int, width = width, height = height,
+    annotation_position = annotation_position
+  ))
   return(summary_results)
 }
